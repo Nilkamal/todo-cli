@@ -10,6 +10,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "nodemon": "^2.0.2"
+    "firebase": "^7.11.0",
+    "nodemon": "^2.0.2",
+    "prompt": "^1.0.0"
   }
 }
