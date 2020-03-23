@@ -4,74 +4,44 @@ const chalk = require("chalk");
 const clear = require("clear");
 const figlet = require("figlet");
 const inquirer = require("inquirer");
-const { firebase } = require("./config/firebase");
+const {
+  firebase
+} = require("./config/firebase");
+
+const log = console.log;
+const text = figlet.textSync;
 
 start();
 
 async function start() {
   clear();
-  console.log(
-    chalk.red(figlet.textSync("TODO-CLI", { horizontalLayout: "full" }))
+  log(
+    chalk.red(text("TODO-CLI", {
+      horizontalLayout: 'full'
+    }))
   );
 
-  await inquirer
-    .prompt([
-      {
-        type: "input",
-        name: "username",
-        message: "Please enter your username",
-        validate: function(value) {
-          if (value.length) {
-            return true;
-          } else {
-            return "Please enter your username";
-          }
-        }
-      },
-      {
-        type: "password",
-        name: "password",
-        message: "Please enter your password",
-        validate: function(value) {
-          if (value.length) {
-            return true;
-          } else {
-            return "Please enter your password";
-          }
-        }
-      }
-    ])
-    .then(answers => {
-      console.log(answers);
-      firebase
-        .auth()
-        .signInWithEmailAndPassword(answers.username, answers.password)
-        .catch(function(error) {
-          // Handle Errors here.
-          var errorCode = error.code;
-          var errorMessage = error.message;
-          console.log(
-            chalk.red(
-              `Something went wrong. ${errorMessage}, error code: ${errorCode}`
-            )
-          );
-        });
-    });
-  await inquirer
-    .prompt([
-      {
-        type: "rawlist",
-        name: "askForTodo",
-        message: `Thanks for  logging in, would you like to enter your first Todo?`,
-        choices: ["yes", "no"]
-      }
-    ])
-    .then(answers => {
-      if (answers.askForTodo === "yes") {
-        console.log(chalk.green("Let's do this"));
-        inquirer
-          .prompt([
-            {
+  try {
+
+    const userInfo = await askUserInfo();
+    const authentication = await firebase.auth().signInWithEmailAndPassword(userInfo.username, userInfo.password);
+    if (authentication) {
+
+      const saveTodo = async ({title, deets, priority}) => {
+        console.log(title, deets, priority)
+        return await firebase
+          .firestore()
+          .collection("Todo")
+          .add({
+            title: title,
+            moreDetails: deets,
+            priority: priority
+          });
+      };
+
+      const todo = async () => {
+        return await inquirer
+          .prompt([{
               type: "input",
               name: "title",
               message: "What is the name of this Todo?"
@@ -87,36 +57,63 @@ async function start() {
               message: "How urgent is this? (high, medium, low)?"
             }
           ])
-          .then(answers => {
-            firebase
-              .firestore()
-              .collection("Todo")
-              .add({
-                title: answers.title,
-                moreDetails: answers.deets,
-                priority: answers.priority
-              });
-          })
-          .then(() => {
-            inquirer
-              .prompt([
-                {
-                  type: "list",
-                  name: "more",
-                  message: "would you like to add another?",
-                  choices: ["yes", "no"]
-                }
-              ])
-              .then(answers => {
-                if (answers.more === "yes") {
-                  console.log(chalk.blue("Ask for more..."));
-                } else {
-                  console.log(chalk.blue("Bye"));
-                }
-              });
-          });
-      } else {
-        console.log(chalk.blue("Bye"));
+      };
+
+      const todoChoice = async () => {
+        return await inquirer
+          .prompt([{
+            type: "list",
+            name: "askForTodo",
+            message: `Thanks for  logging in, would you like to enter your Todo?`,
+            choices: ["yes", "no"]
+          }])
       }
-    });
+      console.log('Choice');
+      let choiceAnswer = await todoChoice();
+      console.log('choice end')
+      console.log(choiceAnswer);
+      while(choiceAnswer.askForTodo === "yes") {
+        const todoAnswer = await todo();
+        const response = await saveTodo(todoAnswer);
+        choiceAnswer = await todoChoice();
+      }
+
+
+    }
+  } catch (error) {
+    console.log(
+      chalk.red(
+        `Something went wrong. ${error.message}, error code: ${error.code}`
+      )
+    );
+  }
+};
+
+async function askUserInfo() {
+  return await inquirer
+    .prompt([{
+        type: "input",
+        name: "username",
+        message: "Please enter your username",
+        validate: function (value) {
+          if (value.length) {
+            return true;
+          } else {
+            return "Please enter your username";
+          }
+        }
+      },
+      {
+        type: "password",
+        name: "password",
+        message: "Please enter your password",
+        validate: function (value) {
+          if (value.length) {
+            return true;
+          } else {
+            return "Please enter your password";
+          }
+        }
+      }
+    ]);
 }
